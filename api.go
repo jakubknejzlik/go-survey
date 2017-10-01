@@ -96,11 +96,22 @@ func handleAnswersDataGET(db *gorm.DB) func(w http.ResponseWriter, r *http.Reque
 func handleAnswersDataPUT(db *gorm.DB) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
-		uid := vars["answerUID"]
+		surveyUID := vars["surveyUID"]
+		answerUID := vars["answerUID"]
+		survey := model.Survey{}
 		answer := model.Answer{}
-		db.FirstOrInit(&answer, model.Answer{Uid: uid})
+
+		err := db.Where("Uid = ?", surveyUID).First(&survey).Error
+		if err == gorm.ErrRecordNotFound {
+			http.Error(w, "answer not found!", http.StatusNotFound)
+			return
+		}
+
+		db.FirstOrInit(&answer, model.Answer{Uid: answerUID})
+
 		data, _ := ioutil.ReadAll(r.Body)
 		answer.Data = string(data)
+		answer.Survey = survey
 		db.Save(&answer)
 		w.WriteHeader(http.StatusNoContent)
 	}

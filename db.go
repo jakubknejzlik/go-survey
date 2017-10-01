@@ -33,6 +33,9 @@ func NewDB(urlString string) (*gorm.DB, error) {
 	fmt.Println("connecting to", URL.Scheme)
 	db, err := gorm.Open(URL.Scheme, urlString)
 	fmt.Println("automigrating models")
+
+	db.Model(&model.Survey{}).Related(&model.Answer{})
+
 	db.AutoMigrate(&model.Answer{})
 	db.AutoMigrate(&model.Survey{})
 
