@@ -1,4 +1,4 @@
-FROM alpine
+FROM ubuntu
 
 RUN apk --update add sqlite
 
