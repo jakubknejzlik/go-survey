@@ -11,7 +11,7 @@ lint:
 
 build:
 	go get ./...
-	GOOS=linux GOARCH=amd64 go build -o bin/go-survey-alpine
+	# GOOS=linux GOARCH=amd64 go build -o bin/go-survey-alpine
 	docker build -t $(GIT_TAG) .
 
 tag:
