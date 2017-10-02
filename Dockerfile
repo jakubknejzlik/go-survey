@@ -1,4 +1,4 @@
-FROM golang:alpine
+FROM alpine
 
 COPY bin/go-survey-alpine /usr/local/bin/go-survey
 
