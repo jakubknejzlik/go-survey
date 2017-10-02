@@ -1,4 +1,4 @@
-FROM kontena/cli
+FROM golang:alpine
 
 COPY bin/go-survey-alpine /usr/local/bin/go-survey
 
