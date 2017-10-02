@@ -5,8 +5,8 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"./model"
 	"github.com/gorilla/mux"
+	"github.com/jakubknejzlik/go-survey/model"
 	"github.com/jinzhu/gorm"
 )
 
