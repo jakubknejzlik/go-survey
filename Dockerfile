@@ -1,12 +1,12 @@
 FROM golang:alpine
 
 RUN apk update && \
-    apk add make git
+    apk add alpine-sdk
 
-COPY . $GOPATH/src/github.com/inloop/go-transport-queue
+COPY . $GOPATH/src/github.com/jakubknejzlik/go-survey
 
-WORKDIR $GOPATH/src/github.com/inloop/go-transport-queue
+WORKDIR $GOPATH/src/github.com/jakubknejzlik/go-survey
 
 RUN make install
 
-ENTRYPOINT ["go-transport-queue"]
+ENTRYPOINT ["go-survey"]
