@@ -1,5 +1,5 @@
 OWNER=jakubknejzlik
-IMAGE_NAME=go-survey
+IMAGE_NAME=kontena-git-cli
 QNAME=$(OWNER)/$(IMAGE_NAME)
 
 GIT_TAG=$(QNAME):$(TRAVIS_COMMIT)
@@ -11,7 +11,7 @@ lint:
 
 build:
 	go get ./...
-	# GOOS=linux GOARCH=amd64 go build -o bin/go-survey-alpine
+	# GOOS=linux GOARCH=amd64 go build -o bin/kontena-git-alpine
 	docker build -t $(GIT_TAG) .
 
 tag:
@@ -28,8 +28,8 @@ push: login
 
 build-local:
 	go get ./...
-	go build -o go-survey
+	go build -o kontena-git
 
 deploy-local:
 	make build-local
-	mv go-survey /usr/local/bin/
+	mv kontena-git /usr/local/bin/

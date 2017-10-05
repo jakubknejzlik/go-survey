@@ -1,6 +1,12 @@
-FROM golang:1.8.3-onbuild
+FROM golang:alpine
 
-RUN apt-get update && apt-get install sqlite3
-# COPY bin/go-survey-alpine /usr/local/bin/go-survey
+RUN apk update && \
+    apk add make git
 
-ENTRYPOINT ["go-survey"]
+COPY . $GOPATH/src/github.com/inloop/go-transport-queue
+
+WORKDIR $GOPATH/src/github.com/inloop/go-transport-queue
+
+RUN make install
+
+ENTRYPOINT ["go-transport-queue"]
