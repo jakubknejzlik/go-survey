@@ -4,7 +4,7 @@ import (
 	"github.com/jinzhu/gorm"
 )
 
-// Survey ...
+// Answer ...
 type Answer struct {
 	gorm.Model
 	Uid      string `gorm:"primary_key"`
