@@ -11,6 +11,12 @@ $.get("/surveys/" + surveyUID, function(data) {
     console.log("data???", survey.data);
   });
 
+  var converter = new showdown.Converter();
+  survey.onTextMarkdown.add(function(survey, options) {
+    var str = converter.makeHtml(options.text);
+    options.html = str;
+  });
+
   // survey.showCompletedPage = false;
 
   $("#surveyElement").Survey({
