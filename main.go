@@ -25,7 +25,7 @@ func main() {
 		cli.IntFlag{
 			Name:   "p,port",
 			EnvVar: "PORT",
-			Value:  80,
+			Value:  8000,
 		},
 	}
 	app.Action = func(c *cli.Context) error {
