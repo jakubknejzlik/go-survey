@@ -14,11 +14,7 @@ import (
 type Answer struct {
 	UID    string `json:"uid"`
 	Data   string `json:"data"`
-	Survey struct {
-		UID     string `json:"uid"`
-		Data    string `json:"data"`
-		Answers []Answer
-	}
+	Survey Survey `json:"survey"`
 }
 
 type Survey struct {
@@ -62,22 +58,26 @@ func getRouter(db *gorm.DB) *mux.Router {
 	ans5 := Answer{UID: "k", Data: "Question5"}
 	AnswerList = append(AnswerList, ans1, ans2, ans3, ans4, ans5)
 
+	var SurveyType *graphql.Object
+
 	var AnswerType = graphql.NewObject(graphql.ObjectConfig{
 		Name: "AnswerType",
-		Fields: graphql.Fields{
-			"uid": &graphql.Field{
-				Type: graphql.String,
-			},
-			"data": &graphql.Field{
-				Type: graphql.String,
-			},
-			"survey": &graphql.Field{
-				Type: graphql.String, // TODO: Change type to Survey
-			},
-		},
+		Fields: graphql.FieldsThunk(func() graphql.Fields {
+			return graphql.Fields{
+				"uid": &graphql.Field{
+					Type: graphql.String,
+				},
+				"data": &graphql.Field{
+					Type: graphql.String,
+				},
+				"survey": &graphql.Field{
+					Type: SurveyType,
+				},
+			}
+		}),
 	})
 
-	var SurveyType = graphql.NewObject(graphql.ObjectConfig{
+	SurveyType = graphql.NewObject(graphql.ObjectConfig{
 		Name: "SurveyType",
 		Fields: graphql.Fields{
 			"uid": &graphql.Field{
