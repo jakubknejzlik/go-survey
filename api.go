@@ -51,11 +51,11 @@ func getRouter(db *gorm.DB) *mux.Router {
 	survey3 := Survey{UID: "k", Data: "Survey3"}
 	SurveyList = append(SurveyList, survey1, survey2, survey3)
 
-	ans1 := Answer{UID: "j", Data: "Question1"}
-	ans2 := Answer{UID: "p", Data: "Question2"}
-	ans3 := Answer{UID: "k", Data: "Question3"}
-	ans4 := Answer{UID: "k", Data: "Question4"}
-	ans5 := Answer{UID: "k", Data: "Question5"}
+	ans1 := Answer{UID: "j", Data: "Question1", Survey: survey1}
+	ans2 := Answer{UID: "p", Data: "Question2", Survey: survey2}
+	ans3 := Answer{UID: "k", Data: "Question3", Survey: survey3}
+	ans4 := Answer{UID: "k", Data: "Question4", Survey: survey3}
+	ans5 := Answer{UID: "k", Data: "Question5", Survey: survey3}
 	AnswerList = append(AnswerList, ans1, ans2, ans3, ans4, ans5)
 
 	var SurveyType *graphql.Object
@@ -96,7 +96,6 @@ func getRouter(db *gorm.DB) *mux.Router {
 					var tmp []Answer
 					for _, v := range AnswerList {
 						if v.UID == survey.UID {
-							v.Data = "Hello Bro"
 							tmp = append(tmp, v)
 						}
 					}
@@ -130,7 +129,7 @@ func getRouter(db *gorm.DB) *mux.Router {
 								return []Survey{v}, nil
 							}
 						}
-						return nil, errors.New("Incrorrect survey uid!")
+						return nil, errors.New("incrorrect survey uid")
 					},
 				},
 			}})
