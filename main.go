@@ -20,7 +20,8 @@ func main() {
 		cli.StringFlag{
 			Name:   "d,database",
 			EnvVar: "DATABASE_URL",
-			Value:  "sqlite3://:memory:",
+			//	Value:  "sqlite3://:memory:",
+			Value: "sqlite3://survey.db",
 		},
 		cli.IntFlag{
 			Name:   "p,port",
@@ -29,7 +30,6 @@ func main() {
 		},
 	}
 	app.Action = func(c *cli.Context) error {
-
 		db, err := NewDB(c.String("database"))
 		if err != nil {
 			return cli.NewExitError(err, 1)

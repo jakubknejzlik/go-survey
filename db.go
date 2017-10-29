@@ -20,7 +20,10 @@ import (
 // NewDB ...
 func NewDB(urlString string) (*gorm.DB, error) {
 
-	URL, _ := url.Parse(urlString)
+	URL, err := url.Parse(urlString)
+	if err != nil {
+		return nil, err
+	}
 
 	if URL == nil {
 		panic("SMTP url not provided")
@@ -34,10 +37,9 @@ func NewDB(urlString string) (*gorm.DB, error) {
 	db, err := gorm.Open(URL.Scheme, urlString)
 	fmt.Println("automigrating models")
 
-	db.Model(&model.Survey{}).Related(&model.Answer{})
+	// db.Model(&model.Survey{}).Related(&model.Answer{})
 
 	db.AutoMigrate(&model.Answer{})
 	db.AutoMigrate(&model.Survey{})
-
 	return db, err
 }

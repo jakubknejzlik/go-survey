@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 
 	"github.com/gorilla/mux"
 	"github.com/graphql-go/graphql"
+	"github.com/jakubknejzlik/go-survey/model"
 	"github.com/jinzhu/gorm"
 )
 
@@ -31,6 +33,7 @@ type Query struct {
 var SurveyList []Survey
 var AnswerList []Answer
 var schema graphql.Schema
+var SurveyType *graphql.Object
 
 func executeQuery(query string, schema graphql.Schema) *graphql.Result {
 	result := graphql.Do(graphql.Params{
@@ -43,39 +46,35 @@ func executeQuery(query string, schema graphql.Schema) *graphql.Result {
 	return result
 }
 
+var AnswerType = graphql.NewObject(graphql.ObjectConfig{
+	Name: "AnswerType",
+	Fields: graphql.FieldsThunk(func() graphql.Fields {
+		return graphql.Fields{
+			"uid": &graphql.Field{
+				Type: graphql.String,
+			},
+			"data": &graphql.Field{
+				Type: graphql.String,
+			},
+			"survey": &graphql.Field{
+				Type: SurveyType,
+			},
+		}
+	}),
+})
+
 func getRouter(db *gorm.DB) *mux.Router {
+
 	r := mux.NewRouter()
-	// Demo data for testing
-	survey1 := Survey{UID: "j", Data: "Survey1"}
-	survey2 := Survey{UID: "p", Data: "Survey2"}
-	survey3 := Survey{UID: "k", Data: "Survey3"}
-	SurveyList = append(SurveyList, survey1, survey2, survey3)
 
-	ans1 := Answer{UID: "j", Data: "Question1", Survey: survey1}
-	ans2 := Answer{UID: "p", Data: "Question2", Survey: survey2}
-	ans3 := Answer{UID: "k", Data: "Question3", Survey: survey3}
-	ans4 := Answer{UID: "k", Data: "Question4", Survey: survey3}
-	ans5 := Answer{UID: "k", Data: "Question5", Survey: survey3}
-	AnswerList = append(AnswerList, ans1, ans2, ans3, ans4, ans5)
+	r.HandleFunc("/", handleIndex())
+	r.HandleFunc("/editor", handleEditor()).Methods("GET")
+	r.HandleFunc("/survey", handleSurvey()).Methods("GET")
 
-	var SurveyType *graphql.Object
-
-	var AnswerType = graphql.NewObject(graphql.ObjectConfig{
-		Name: "AnswerType",
-		Fields: graphql.FieldsThunk(func() graphql.Fields {
-			return graphql.Fields{
-				"uid": &graphql.Field{
-					Type: graphql.String,
-				},
-				"data": &graphql.Field{
-					Type: graphql.String,
-				},
-				"survey": &graphql.Field{
-					Type: SurveyType,
-				},
-			}
-		}),
-	})
+	r.HandleFunc("/surveys/{surveyUID}", handleSurveyDataGET(db)).Methods("GET")
+	r.HandleFunc("/surveys/{surveyUID}", handleSurveyDataPUT(db)).Methods("PUT")
+	r.HandleFunc("/surveys/{surveyUID}/answers/{answerUID}", handleAnswersDataGET(db)).Methods("GET")
+	r.HandleFunc("/surveys/{surveyUID}/answers/{answerUID}", handleAnswersDataPUT(db)).Methods("PUT")
 
 	SurveyType = graphql.NewObject(graphql.ObjectConfig{
 		Name: "SurveyType",
@@ -93,13 +92,21 @@ func getRouter(db *gorm.DB) *mux.Router {
 					if !ok {
 						return nil, errors.New("Error with answers")
 					}
-					var tmp []Answer
-					for _, v := range AnswerList {
-						if v.UID == survey.UID {
-							tmp = append(tmp, v)
-						}
+					// TODO: Return all answers related with survey
+
+					dbAnswers := []model.Answer{}
+					err := db.Find(&dbAnswers).Error
+
+					if err == gorm.ErrRecordNotFound {
+						return nil, errors.New("answer not found")
 					}
-					return tmp, nil
+
+					var answers []Answer
+					for _, v := range dbAnswers {
+						answers = append(answers, Answer{UID: v.Uid, Data: v.Data, Survey: survey})
+					}
+
+					return answers, nil
 
 				},
 			},
@@ -122,14 +129,24 @@ func getRouter(db *gorm.DB) *mux.Router {
 					Resolve: func(params graphql.ResolveParams) (interface{}, error) {
 						uid, ok := params.Args["uid"].(string)
 						if !ok {
-							return SurveyList, nil
-						}
-						for _, v := range SurveyList {
-							if v.UID == uid {
-								return []Survey{v}, nil
+							var surveys []Survey
+							dbSurveys := []model.Survey{}
+
+							db.Find(&dbSurveys)
+
+							for _, v := range dbSurveys {
+								surveys = append(surveys, Survey{UID: v.Uid, Data: v.Data})
 							}
+							return surveys, nil
 						}
-						return nil, errors.New("incrorrect survey uid")
+
+						survey := model.Survey{}
+						err := db.Where("Uid = ?", uid).First(&survey).Error
+						if err == gorm.ErrRecordNotFound {
+							return nil, errors.New("survey not found")
+						}
+						return []Survey{Survey{UID: survey.Uid, Data: survey.Data}}, nil
+
 					},
 				},
 			}})
@@ -141,6 +158,7 @@ func getRouter(db *gorm.DB) *mux.Router {
 	)
 
 	r.HandleFunc("/graphql", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		result := executeQuery(r.URL.Query().Get("query"), schema)
 		json.NewEncoder(w).Encode(result)
 	}).Methods("GET")
@@ -148,4 +166,96 @@ func getRouter(db *gorm.DB) *mux.Router {
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
 	return r
+}
+
+func handleIndex() func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "hello world")
+	}
+}
+
+func handleEditor() func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		data, _ := ioutil.ReadFile("views/editor.html")
+		w.Write(data)
+	}
+}
+
+func handleSurvey() func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		data, _ := ioutil.ReadFile("views/survey.html")
+		w.Write(data)
+	}
+}
+
+func handleSurveyDataGET(db *gorm.DB) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		uid := vars["surveyUID"]
+		survey := model.Survey{}
+		err := db.Where("Uid = ?", uid).First(&survey).Error
+		if err == gorm.ErrRecordNotFound {
+			http.Error(w, "not found!", http.StatusNotFound)
+			return
+		}
+		data := survey.Data
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(data))
+	}
+}
+
+func handleSurveyDataPUT(db *gorm.DB) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		uid := vars["surveyUID"]
+		survey := model.Survey{}
+		db.FirstOrInit(&survey, model.Survey{Uid: uid})
+		data, _ := ioutil.ReadAll(r.Body)
+		survey.Data = string(data)
+		err := db.Save(&survey).Error
+		if err != nil {
+			fmt.Println(err)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func handleAnswersDataGET(db *gorm.DB) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		uid := vars["answerUID"]
+		answer := model.Answer{}
+		err := db.Where("Uid = ?", uid).First(&answer).Error
+		if err == gorm.ErrRecordNotFound {
+			http.Error(w, "answer not found!", http.StatusNotFound)
+			return
+		}
+		data := answer.Data
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(data))
+	}
+}
+
+func handleAnswersDataPUT(db *gorm.DB) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := mux.Vars(r)
+		surveyUID := vars["surveyUID"]
+		answerUID := vars["answerUID"]
+		survey := model.Survey{}
+		answer := model.Answer{}
+
+		err := db.Where("Uid = ?", surveyUID).First(&survey).Error
+		if err == gorm.ErrRecordNotFound {
+			http.Error(w, "answer not found!", http.StatusNotFound)
+			return
+		}
+
+		db.FirstOrInit(&answer, model.Answer{Uid: answerUID})
+
+		data, _ := ioutil.ReadAll(r.Body)
+		answer.Data = string(data)
+		answer.Survey = survey
+		db.Save(&answer)
+		w.WriteHeader(http.StatusNoContent)
+	}
 }
