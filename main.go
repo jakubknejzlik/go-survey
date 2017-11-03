@@ -21,7 +21,7 @@ func main() {
 			Name:   "d,database",
 			EnvVar: "DATABASE_URL",
 			//	Value:  "sqlite3://:memory:",
-			Value: "sqlite3://survey.db",
+			Value: "sqlite3://test.db",
 		},
 		cli.IntFlag{
 			Name:   "p,port",

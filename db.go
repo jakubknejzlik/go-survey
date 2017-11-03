@@ -9,7 +9,7 @@ import (
 	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
 
-	"github.com/jakubknejzlik/go-survey/model"
+	"./model"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mssql"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
@@ -29,15 +29,9 @@ func NewDB(urlString string) (*gorm.DB, error) {
 		panic("SMTP url not provided")
 	}
 
-	if URL.Scheme == "sqlite3" {
-		urlString = URL.Path
-	}
-
 	fmt.Println("connecting to", URL.Scheme)
-	db, err := gorm.Open(URL.Scheme, urlString)
-	fmt.Println("automigrating models")
-
-	// db.Model(&model.Survey{}).Related(&model.Answer{})
+	db, err := gorm.Open(URL.Scheme, URL.Hostname()+URL.Path)
+	db.LogMode(true)
 
 	db.AutoMigrate(&model.Answer{})
 	db.AutoMigrate(&model.Survey{})

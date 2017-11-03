@@ -1,13 +1,14 @@
 package model
 
-import (
-	"github.com/jinzhu/gorm"
-)
+import "time"
 
 // Survey ...
 type Survey struct {
-	gorm.Model
 	Uid     string `gorm:"primary_key"`
 	Data    string
-	Answers []Answer
+	Answers []Answer `gorm:"ForeignKey:SurveyUid;AssociationForeignKey:Uid"`
+
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt *time.Time `sql:"index"`
 }

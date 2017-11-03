@@ -7,9 +7,9 @@ import (
 	"io/ioutil"
 	"net/http"
 
+	"./model"
 	"github.com/gorilla/mux"
 	"github.com/graphql-go/graphql"
-	"github.com/jakubknejzlik/go-survey/model"
 	"github.com/jinzhu/gorm"
 )
 
@@ -30,8 +30,6 @@ type Query struct {
 	Surveys string `json:"surveys"`
 }
 
-var SurveyList []Survey
-var AnswerList []Answer
 var schema graphql.Schema
 var SurveyType *graphql.Object
 
@@ -92,17 +90,16 @@ func getRouter(db *gorm.DB) *mux.Router {
 					if !ok {
 						return nil, errors.New("Error with answers")
 					}
-					// TODO: Return all answers related with survey
 
-					dbAnswers := []model.Answer{}
-					err := db.Find(&dbAnswers).Error
+					sur := model.Survey{Uid: survey.UID, Data: survey.Data}
 
+					err := db.Model(&sur).Related(&sur.Answers, "SurveyUid").Error
 					if err == gorm.ErrRecordNotFound {
 						return nil, errors.New("answer not found")
 					}
 
 					var answers []Answer
-					for _, v := range dbAnswers {
+					for _, v := range sur.Answers {
 						answers = append(answers, Answer{UID: v.Uid, Data: v.Data, Survey: survey})
 					}
 
@@ -199,6 +196,7 @@ func handleSurveyDataGET(db *gorm.DB) func(w http.ResponseWriter, r *http.Reques
 			return
 		}
 		data := survey.Data
+		fmt.Println(data)
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(data))
 	}
@@ -208,10 +206,13 @@ func handleSurveyDataPUT(db *gorm.DB) func(w http.ResponseWriter, r *http.Reques
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		uid := vars["surveyUID"]
-		survey := model.Survey{}
-		db.FirstOrInit(&survey, model.Survey{Uid: uid})
+
 		data, _ := ioutil.ReadAll(r.Body)
-		survey.Data = string(data)
+		survey := model.Survey{
+			Uid:  uid,
+			Data: string(data),
+		}
+
 		err := db.Save(&survey).Error
 		if err != nil {
 			fmt.Println(err)
@@ -241,21 +242,23 @@ func handleAnswersDataPUT(db *gorm.DB) func(w http.ResponseWriter, r *http.Reque
 		vars := mux.Vars(r)
 		surveyUID := vars["surveyUID"]
 		answerUID := vars["answerUID"]
-		survey := model.Survey{}
-		answer := model.Answer{}
 
-		err := db.Where("Uid = ?", surveyUID).First(&survey).Error
+		err := db.Where("Uid = ?", surveyUID).First(&model.Survey{}).Error
 		if err == gorm.ErrRecordNotFound {
 			http.Error(w, "answer not found!", http.StatusNotFound)
 			return
 		}
 
-		db.FirstOrInit(&answer, model.Answer{Uid: answerUID})
-
 		data, _ := ioutil.ReadAll(r.Body)
-		answer.Data = string(data)
-		answer.Survey = survey
+
+		answer := model.Answer{
+			Uid:       answerUID,
+			Data:      string(data),
+			SurveyUid: surveyUID,
+		}
+
 		db.Save(&answer)
+
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
