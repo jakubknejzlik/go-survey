@@ -3,8 +3,8 @@ package main
 import (
 	"errors"
 
-	"./model"
 	"github.com/graphql-go/graphql"
+	"github.com/jakubknejzlik/go-survey/model"
 	"github.com/jinzhu/gorm"
 )
 
