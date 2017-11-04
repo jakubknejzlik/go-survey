@@ -20,24 +20,20 @@ import (
 // NewDB ...
 func NewDB(urlString string) (*gorm.DB, error) {
 
-	URL, _ := url.Parse(urlString)
+	URL, err := url.Parse(urlString)
+	if err != nil {
+		return nil, err
+	}
 
 	if URL == nil {
 		panic("SMTP url not provided")
 	}
 
-	if URL.Scheme == "sqlite3" {
-		urlString = URL.Path
-	}
-
 	fmt.Println("connecting to", URL.Scheme)
-	db, err := gorm.Open(URL.Scheme, urlString)
-	fmt.Println("automigrating models")
-
-	db.Model(&model.Survey{}).Related(&model.Answer{})
+	db, err := gorm.Open(URL.Scheme, URL.Hostname()+URL.Path)
+	db.LogMode(true)
 
 	db.AutoMigrate(&model.Answer{})
 	db.AutoMigrate(&model.Survey{})
-
 	return db, err
 }

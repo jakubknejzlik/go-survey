@@ -6,14 +6,27 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/graphql-go/handler"
 	"github.com/jakubknejzlik/go-survey/model"
 	"github.com/jinzhu/gorm"
 )
 
+type Answer struct {
+	UID    string `json:"uid"`
+	Data   string `json:"data"`
+	Survey Survey `json:"survey"`
+}
+
+type Survey struct {
+	UID     string `json:"uid"`
+	Data    string `json:"data"`
+	Answers []Answer
+}
+
 func getRouter(db *gorm.DB) *mux.Router {
+
 	r := mux.NewRouter()
 
-	// f := r.PathPrefix("/files").Subrouter()
 	r.HandleFunc("/", handleIndex())
 	r.HandleFunc("/editor", handleEditor()).Methods("GET")
 	r.HandleFunc("/survey", handleSurvey()).Methods("GET")
@@ -22,6 +35,15 @@ func getRouter(db *gorm.DB) *mux.Router {
 	r.HandleFunc("/surveys/{surveyUID}", handleSurveyDataPUT(db)).Methods("PUT")
 	r.HandleFunc("/surveys/{surveyUID}/answers/{answerUID}", handleAnswersDataGET(db)).Methods("GET")
 	r.HandleFunc("/surveys/{surveyUID}/answers/{answerUID}", handleAnswersDataPUT(db)).Methods("PUT")
+
+	schema := getSchema(db)
+
+	graphqlHandler := handler.New(&handler.Config{
+		Schema:   &schema,
+		Pretty:   true,
+		GraphiQL: true,
+	})
+	r.HandleFunc("/graphql", graphqlHandler.ServeHTTP)
 
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
@@ -68,11 +90,17 @@ func handleSurveyDataPUT(db *gorm.DB) func(w http.ResponseWriter, r *http.Reques
 	return func(w http.ResponseWriter, r *http.Request) {
 		vars := mux.Vars(r)
 		uid := vars["surveyUID"]
-		survey := model.Survey{}
-		db.FirstOrInit(&survey, model.Survey{Uid: uid})
+
 		data, _ := ioutil.ReadAll(r.Body)
-		survey.Data = string(data)
-		db.Save(&survey)
+		survey := model.Survey{
+			Uid:  uid,
+			Data: string(data),
+		}
+
+		err := db.Save(&survey).Error
+		if err != nil {
+			fmt.Println(err)
+		}
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
@@ -98,21 +126,23 @@ func handleAnswersDataPUT(db *gorm.DB) func(w http.ResponseWriter, r *http.Reque
 		vars := mux.Vars(r)
 		surveyUID := vars["surveyUID"]
 		answerUID := vars["answerUID"]
-		survey := model.Survey{}
-		answer := model.Answer{}
 
-		err := db.Where("Uid = ?", surveyUID).First(&survey).Error
+		err := db.Where("Uid = ?", surveyUID).First(&model.Survey{}).Error
 		if err == gorm.ErrRecordNotFound {
 			http.Error(w, "answer not found!", http.StatusNotFound)
 			return
 		}
 
-		db.FirstOrInit(&answer, model.Answer{Uid: answerUID})
-
 		data, _ := ioutil.ReadAll(r.Body)
-		answer.Data = string(data)
-		answer.Survey = survey
+
+		answer := model.Answer{
+			Uid:       answerUID,
+			Data:      string(data),
+			SurveyUid: surveyUID,
+		}
+
 		db.Save(&answer)
+
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

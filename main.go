@@ -29,7 +29,6 @@ func main() {
 		},
 	}
 	app.Action = func(c *cli.Context) error {
-
 		db, err := NewDB(c.String("database"))
 		if err != nil {
 			return cli.NewExitError(err, 1)
