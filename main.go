@@ -20,13 +20,12 @@ func main() {
 		cli.StringFlag{
 			Name:   "d,database",
 			EnvVar: "DATABASE_URL",
-			//	Value:  "sqlite3://:memory:",
-			Value: "sqlite3://test.db",
+			Value:  "sqlite3://:memory:",
 		},
 		cli.IntFlag{
 			Name:   "p,port",
 			EnvVar: "PORT",
-			Value:  8000,
+			Value:  80,
 		},
 	}
 	app.Action = func(c *cli.Context) error {
