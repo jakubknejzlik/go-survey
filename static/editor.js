@@ -3,7 +3,7 @@ Survey.defaultBootstrapCss.navigationButton = "btn btn-green";
 
 var surveyUID = $.url().param("survey");
 
-$.get("/surveys/" + surveyUID, function(data) {
+$.get("surveys/" + surveyUID, function(data) {
   editor.text = JSON.stringify(data);
 });
 
@@ -13,7 +13,7 @@ var editor = new SurveyEditor.SurveyEditor("editorElement", editorOptions);
 editor.saveSurveyFunc = function() {
   $.ajax({
     method: "PUT",
-    url: "/surveys/" + surveyUID,
+    url: "surveys/" + surveyUID,
     contentType: "application/json; charset=utf-8",
     data: JSON.stringify(JSON.parse(editor.text))
   })

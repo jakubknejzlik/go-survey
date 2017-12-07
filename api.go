@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 
 	"github.com/gorilla/mux"
 	"github.com/graphql-go/handler"
@@ -36,6 +38,8 @@ func getRouter(db *gorm.DB) *mux.Router {
 	r.HandleFunc("/surveys/{surveyUID}/answers/{answerUID}", handleAnswersDataGET(db)).Methods("GET")
 	r.HandleFunc("/surveys/{surveyUID}/answers/{answerUID}", handleAnswersDataPUT(db)).Methods("PUT")
 
+	r.HandleFunc("/properties.js", handleProperties()).Methods("GET")
+
 	schema := getSchema(db)
 
 	graphqlHandler := handler.New(&handler.Config{
@@ -60,6 +64,27 @@ func handleEditor() func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		data, _ := ioutil.ReadFile("views/editor.html")
 		w.Write(data)
+	}
+}
+
+func handleProperties() func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		propertiesUrl := os.Getenv("PROPERTIES_URL")
+		if propertiesUrl == "" {
+			fmt.Fprint(w, "window.PROPERTIES = []")
+		} else {
+			resp, err := http.Get(propertiesUrl)
+			if err != nil {
+				fmt.Fprintf(w, "console.log(\"error: %s\")", err.Error())
+				return
+			}
+			data, err := ioutil.ReadAll(resp.Body)
+			if err != nil {
+				fmt.Fprintf(w, "console.log(\"error: %s\")", err.Error())
+				return
+			}
+			w.Write(data)
+		}
 	}
 }
 
@@ -144,5 +169,12 @@ func handleAnswersDataPUT(db *gorm.DB) func(w http.ResponseWriter, r *http.Reque
 		db.Save(&answer)
 
 		w.WriteHeader(http.StatusNoContent)
+
+		answerWebhookURL := os.Getenv("ANSWER_WEBHOOK_URL")
+		if answerWebhookURL != "" {
+			data = []byte(fmt.Sprintf("{\"survey\":\"%s\",\"asnwer\":\"%s\"}", surveyUID, answerUID))
+			reader := bytes.NewReader(data)
+			http.Post(answerWebhookURL, "application/json", reader)
+		}
 	}
 }

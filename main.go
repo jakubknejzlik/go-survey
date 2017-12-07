@@ -14,10 +14,6 @@ func main() {
 	app := cli.NewApp()
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
-			Name:   "s,storage",
-			EnvVar: "STORAGE_URL",
-		},
-		cli.StringFlag{
 			Name:   "d,database",
 			EnvVar: "DATABASE_URL",
 			Value:  "sqlite3://:memory:",
