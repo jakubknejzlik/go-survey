@@ -88,9 +88,14 @@ func handleProperties() func(w http.ResponseWriter, r *http.Request) {
 				fmt.Fprintf(w, "console.log(\"invalid url: %s\")", propertiesUrl)
 				return
 			}
+
+			q := req.URL.Query()
+			for key, value := range r.URL.Query() {
+				q.Add(key, strings.Join(value, ";"))
+			}
+			req.URL.RawQuery = q.Encode()
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", getToken(r)))
 
-			fmt.Println(req.Header.Get("Authorization"))
 			resp, err := client.Do(req)
 			if err != nil {
 				fmt.Fprintf(w, "console.log(\"error: %s\")", err.Error())
