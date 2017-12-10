@@ -4,37 +4,54 @@ Survey.defaultBootstrapCss.navigationButton = "btn btn-green";
 var surveyUID = $.url().param("survey");
 var answerUID = $.url().param("answer");
 
-$.get("surveys/" + surveyUID, function(data) {
-  var survey = new Survey.Model(data);
-  survey.onComplete.add(saveAnswers);
-  survey.onComplete.add(function() {
-    console.log("data???", survey.data);
-  });
+$.get(
+  "surveys/" + surveyUID + "?access_token=" + $.QueryString.access_token,
+  function(data) {
+    var survey = new Survey.Model(data);
+    survey.onComplete.add(saveAnswers);
+    survey.onComplete.add(function() {
+      console.log("data???", survey.data);
+    });
 
-  var converter = new showdown.Converter();
-  survey.onTextMarkdown.add(function(survey, options) {
-    var str = converter.makeHtml(options.text);
-    options.html = str;
-  });
+    var converter = new showdown.Converter();
+    survey.onTextMarkdown.add(function(survey, options) {
+      var str = converter.makeHtml(options.text);
+      options.html = str;
+    });
 
-  // survey.showCompletedPage = false;
+    // survey.showCompletedPage = false;
 
-  $("#surveyElement").Survey({
-    model: survey,
-    completeHtml: "Dekujeme"
-  });
+    $("#surveyElement").Survey({
+      model: survey,
+      completeHtml: "Thank you"
+    });
 
-  $.get("surveys/" + surveyUID + "/answers/" + answerUID, function(data) {
-    for (var key in data) {
-      survey.setValue(key, data[key]);
-    }
-  });
-});
+    $.get(
+      "surveys/" +
+        surveyUID +
+        "/answers/" +
+        answerUID +
+        "?access_token=" +
+        $.QueryString.access_token,
+      function(data) {
+        for (var key in data) {
+          survey.setValue(key, data[key]);
+        }
+      }
+    );
+  }
+);
 
 var saveAnswers = function(result) {
   $.ajax({
     method: "PUT",
-    url: "surveys/" + surveyUID + "/answers/" + answerUID,
+    url:
+      "surveys/" +
+      surveyUID +
+      "/answers/" +
+      answerUID +
+      "?access_token=" +
+      $.QueryString.access_token,
     contentType: "application/json; charset=utf-8",
     data: JSON.stringify(result.data)
   })

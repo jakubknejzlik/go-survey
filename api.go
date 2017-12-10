@@ -2,11 +2,14 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
 	"github.com/graphql-go/handler"
 	"github.com/jakubknejzlik/go-survey/model"
@@ -38,7 +41,7 @@ func getRouter(db *gorm.DB) *mux.Router {
 	r.HandleFunc("/surveys/{surveyUID}/answers/{answerUID}", handleAnswersDataGET(db)).Methods("GET")
 	r.HandleFunc("/surveys/{surveyUID}/answers/{answerUID}", handleAnswersDataPUT(db)).Methods("PUT")
 
-	r.HandleFunc("/properties.js", handleProperties()).Methods("GET")
+	r.HandleFunc("/properties.json", handleProperties()).Methods("GET")
 
 	schema := getSchema(db)
 
@@ -62,6 +65,10 @@ func handleIndex() func(w http.ResponseWriter, r *http.Request) {
 
 func handleEditor() func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if err := validateToken(r); err != nil {
+			fmt.Fprint(w, "invalid access token")
+			return
+		}
 		data, _ := ioutil.ReadFile("views/editor.html")
 		w.Write(data)
 	}
@@ -71,9 +78,20 @@ func handleProperties() func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		propertiesUrl := os.Getenv("PROPERTIES_URL")
 		if propertiesUrl == "" {
-			fmt.Fprint(w, "window.PROPERTIES = []")
+			fmt.Fprint(w, "[]")
 		} else {
-			resp, err := http.Get(propertiesUrl)
+
+			client := &http.Client{}
+
+			req, err := http.NewRequest("GET", propertiesUrl, nil)
+			if err != nil {
+				fmt.Fprintf(w, "console.log(\"invalid url: %s\")", propertiesUrl)
+				return
+			}
+			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", getToken(r)))
+
+			fmt.Println(req.Header.Get("Authorization"))
+			resp, err := client.Do(req)
 			if err != nil {
 				fmt.Fprintf(w, "console.log(\"error: %s\")", err.Error())
 				return
@@ -83,6 +101,7 @@ func handleProperties() func(w http.ResponseWriter, r *http.Request) {
 				fmt.Fprintf(w, "console.log(\"error: %s\")", err.Error())
 				return
 			}
+			w.Header().Set("Content-Type", "application/json")
 			w.Write(data)
 		}
 	}
@@ -90,6 +109,10 @@ func handleProperties() func(w http.ResponseWriter, r *http.Request) {
 
 func handleSurvey() func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if err := validateToken(r); err != nil {
+			fmt.Fprint(w, "invalid access token")
+			return
+		}
 		data, _ := ioutil.ReadFile("views/survey.html")
 		w.Write(data)
 	}
@@ -97,6 +120,10 @@ func handleSurvey() func(w http.ResponseWriter, r *http.Request) {
 
 func handleSurveyDataGET(db *gorm.DB) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if err := validateToken(r); err != nil {
+			fmt.Fprint(w, "invalid access token")
+			return
+		}
 		vars := mux.Vars(r)
 		uid := vars["surveyUID"]
 		survey := model.Survey{}
@@ -113,6 +140,12 @@ func handleSurveyDataGET(db *gorm.DB) func(w http.ResponseWriter, r *http.Reques
 
 func handleSurveyDataPUT(db *gorm.DB) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+
+		if err := validateToken(r); err != nil {
+			fmt.Fprint(w, "invalid access token")
+			return
+		}
+
 		vars := mux.Vars(r)
 		uid := vars["surveyUID"]
 
@@ -132,6 +165,12 @@ func handleSurveyDataPUT(db *gorm.DB) func(w http.ResponseWriter, r *http.Reques
 
 func handleAnswersDataGET(db *gorm.DB) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
+
+		if err := validateToken(r); err != nil {
+			fmt.Fprint(w, "invalid access token")
+			return
+		}
+
 		vars := mux.Vars(r)
 		uid := vars["answerUID"]
 		answer := model.Answer{}
@@ -177,4 +216,41 @@ func handleAnswersDataPUT(db *gorm.DB) func(w http.ResponseWriter, r *http.Reque
 			http.Post(answerWebhookURL, "application/json", reader)
 		}
 	}
+}
+
+func getToken(r *http.Request) string {
+	tokenString := r.URL.Query().Get("access_token") //"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmb28iOiJiYXIiLCJuYmYiOjE0NDQ0Nzg0MDB9.u1riaD1rW97opCoAuRCTy4w58Br-Zk-bh7vLiRIsrpU"
+	if tokenString == "" {
+		tokenString = r.Header.Get("Authorization")
+	}
+
+	tokenString = strings.Replace(tokenString, "Bearer ", "", 1)
+	return tokenString
+}
+
+func validateToken(r *http.Request) error {
+	tokenString := getToken(r)
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		secret = "JWT_SECRET"
+	}
+	if tokenString == "" {
+		return errors.New("missing token")
+	}
+
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+		}
+		return []byte(secret), nil
+	})
+
+	if err != nil {
+		return err
+	}
+
+	if _, ok := token.Claims.(jwt.MapClaims); !ok || !token.Valid {
+		return errors.New("invalid token")
+	}
+	return nil
 }

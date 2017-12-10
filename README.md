@@ -12,6 +12,7 @@ Service build using SurveyJS library. Create and edit
 * `PROPERTIES_URL` - url to load properties from. See below for example
 * `ANSWER_WEBHOOK_URL` - url which is called when answer is created/updated
   (payload is in format {"survey":"XXX","answer":"YYY"})
+* `JWT_SECRET` - secret for validating JWT
 
 ## Properties
 
